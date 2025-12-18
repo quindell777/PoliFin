@@ -82,7 +82,7 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
           ))}
         </Pie>
         <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-        <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+        <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{fontSize: "12px"}} />
       </PieChart>
     </ResponsiveContainer>
   );
