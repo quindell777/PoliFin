@@ -5,6 +5,13 @@ import Papa from 'papaparse';
 
 const STORAGE_KEY = 'POLIFIN_DATA_DB';
 
+// Validation log for library loading
+if (!Papa) {
+  console.error("[DataService] CRITICAL: PapaParse library not loaded correctly.");
+} else {
+  console.log("[DataService] PapaParse library loaded.");
+}
+
 const parseNumber = (val: string): number => {
   if (!val) return 0;
   // Ensure we are working with a string
@@ -25,10 +32,16 @@ const parseDate = (val: string): string => {
 };
 
 const parseExpenses = (csv: string): Expense[] => {
+  console.log("[DataService] Parsing expenses CSV (length: " + csv.length + " chars)...");
+  
   // Find where the actual data starts (header row)
   const headerSignature = 'Data da despesa';
   const headerIndex = csv.indexOf(headerSignature);
   
+  if (headerIndex === -1) {
+    console.warn("[DataService] Warning: Expense header not found in CSV.");
+  }
+
   // Slice the CSV from the header onwards to avoid metadata issues
   const cleanCsv = headerIndex >= 0 ? csv.substring(headerIndex) : csv;
 
@@ -39,7 +52,11 @@ const parseExpenses = (csv: string): Expense[] => {
     delimiter: ';', // SPCA standard is usually semicolon
   });
 
-  return result.data.map((row: any) => ({
+  if (result.errors && result.errors.length > 0) {
+    console.warn("[DataService] PapaParse encountered errors:", result.errors);
+  }
+
+  const parsed = result.data.map((row: any) => ({
     date: parseDate(row['Data da despesa']),
     providerName: row['Nome / Razão'] || row['Nome/Razão'] || 'Fornecedor Desconhecido',
     documentNumber: row['Nº do documento'] || '',
@@ -47,11 +64,21 @@ const parseExpenses = (csv: string): Expense[] => {
     description: row['Descrição da despesa'] || '',
     nature: row['Natureza do gasto'] || ''
   })).filter((item: Expense) => item.date && (item.value > 0 || item.description !== ''));
+
+  console.log(`[DataService] Expenses parsed successfully. Count: ${parsed.length}`);
+  return parsed;
 };
 
 const parseIncome = (csv: string): Income[] => {
+  console.log("[DataService] Parsing income CSV (length: " + csv.length + " chars)...");
+
   const headerSignature = 'Data da receita';
   const headerIndex = csv.indexOf(headerSignature);
+  
+  if (headerIndex === -1) {
+    console.warn("[DataService] Warning: Income header not found in CSV.");
+  }
+
   const cleanCsv = headerIndex >= 0 ? csv.substring(headerIndex) : csv;
 
   const result = Papa.parse(cleanCsv, {
@@ -60,7 +87,11 @@ const parseIncome = (csv: string): Income[] => {
     delimiter: ';',
   });
 
-  return result.data.map((row: any) => ({
+  if (result.errors && result.errors.length > 0) {
+    console.warn("[DataService] PapaParse encountered errors:", result.errors);
+  }
+
+  const parsed = result.data.map((row: any) => ({
     date: parseDate(row['Data da receita']),
     donorName: row['Nome / Razão'] || row['Nome/Razão'] || 'Doador Desconhecido',
     type: row['Espécie do recurso'] || '',
@@ -68,6 +99,9 @@ const parseIncome = (csv: string): Income[] => {
     nature: row['Natureza do recurso'] || '',
     value: parseNumber(row['Valor da doação'])
   })).filter((item: Income) => item.date && item.value > 0);
+
+  console.log(`[DataService] Income parsed successfully. Count: ${parsed.length}`);
+  return parsed;
 };
 
 // --- DATA MANAGEMENT ---
@@ -79,15 +113,19 @@ export interface PartyRecord {
 }
 
 export const getStoredParties = (): Record<string, PartyRecord> => {
+  console.log("[DataService] Attempting to read parties from localStorage...");
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      console.log(`[DataService] Loaded ${Object.keys(parsed).length} parties from storage.`);
+      return parsed;
     }
   } catch (e) {
-    console.error("Error reading storage", e);
+    console.error("[DataService] Error reading storage:", e);
   }
   
+  console.log("[DataService] No valid storage found. Initializing with default data.");
   // Return default data if storage is empty
   const defaultData = {
     "Progressistas (PP)": {
@@ -102,17 +140,23 @@ export const getStoredParties = (): Record<string, PartyRecord> => {
 };
 
 export const savePartyData = (name: string, incomeCsv: string, expenseCsv: string) => {
+  console.log(`[DataService] Saving party data: ${name}`);
   const currentData = getStoredParties();
   currentData[name] = { name, incomeCsv, expenseCsv };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+  console.log("[DataService] Saved successfully.");
   return currentData;
 };
 
 export const deletePartyData = (name: string) => {
+  console.log(`[DataService] Deleting party data: ${name}`);
   const currentData = getStoredParties();
   if (currentData[name]) {
     delete currentData[name];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+    console.log("[DataService] Deleted successfully.");
+  } else {
+    console.warn(`[DataService] Party ${name} not found for deletion.`);
   }
   return currentData;
 };
@@ -120,11 +164,14 @@ export const deletePartyData = (name: string) => {
 // --- AGGREGATION ---
 
 export const getDashboardData = (incomeCsv: string, expenseCsv: string): DashboardSummary => {
+  console.log("[DataService] Aggregating dashboard data...");
   const expenses = parseExpenses(expenseCsv);
   const incomes = parseIncome(incomeCsv);
 
   const totalExpense = expenses.reduce((acc, cur) => acc + cur.value, 0);
   const totalIncome = incomes.reduce((acc, cur) => acc + cur.value, 0);
+
+  console.log(`[DataService] Totals calculated. Income: ${totalIncome}, Expense: ${totalExpense}`);
 
   // Group by Top Donors
   const donorMap = new Map<string, number>();
@@ -192,6 +239,8 @@ export const getDashboardData = (incomeCsv: string, expenseCsv: string): Dashboa
           income: val.income,
           expense: val.expense
       }));
+
+  console.log("[DataService] Aggregation complete.");
 
   return {
     totalIncome,

@@ -15,6 +15,7 @@ const DataUpload: React.FC<Props> = ({ onDataSaved }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'income' | 'expense') => {
     if (e.target.files && e.target.files[0]) {
+      console.log(`[Upload] User selected ${type} file: ${e.target.files[0].name}`);
       if (type === 'income') setIncomeFile(e.target.files[0]);
       else setExpenseFile(e.target.files[0]);
     }
@@ -22,9 +23,16 @@ const DataUpload: React.FC<Props> = ({ onDataSaved }) => {
 
   const readFile = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      console.log(`[Upload] Starting to read file: ${file.name}`);
       const reader = new FileReader();
-      reader.onload = (event) => resolve(event.target?.result as string);
-      reader.onerror = (error) => reject(error);
+      reader.onload = (event) => {
+        console.log(`[Upload] Finished reading file: ${file.name}`);
+        resolve(event.target?.result as string);
+      };
+      reader.onerror = (error) => {
+        console.error(`[Upload] Error reading file ${file.name}:`, error);
+        reject(error);
+      };
       reader.readAsText(file); // Default encoding UTF-8, usually fine for CSV
     });
   };
@@ -32,6 +40,7 @@ const DataUpload: React.FC<Props> = ({ onDataSaved }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    console.log("[Upload] Submitting upload form...");
     
     if (!partyName.trim()) {
       setError('Por favor, informe o nome do partido.');
@@ -47,7 +56,10 @@ const DataUpload: React.FC<Props> = ({ onDataSaved }) => {
       const incomeCsv = await readFile(incomeFile);
       const expenseCsv = await readFile(expenseFile);
       
+      console.log("[Upload] Files read. Saving data...");
       savePartyData(partyName, incomeCsv, expenseCsv);
+      
+      console.log("[Upload] Data saved. Triggering callback...");
       onDataSaved(partyName);
       
       // Reset form
@@ -55,7 +67,7 @@ const DataUpload: React.FC<Props> = ({ onDataSaved }) => {
       setIncomeFile(null);
       setExpenseFile(null);
     } catch (err) {
-      console.error(err);
+      console.error("[Upload] Upload failed:", err);
       setError('Erro ao processar arquivos. Verifique se são CSVs válidos.');
     } finally {
       setLoading(false);

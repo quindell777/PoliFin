@@ -11,10 +11,18 @@ import { DashboardSummary } from './types';
 type ViewState = 'dashboard' | 'incomes' | 'expenses' | 'upload';
 
 function App() {
-  const [parties, setParties] = useState(getStoredParties());
+  console.log("[App] Rendering main component...");
+  
+  const [parties, setParties] = useState(() => {
+    console.log("[App] Initial state: loading stored parties");
+    return getStoredParties();
+  });
+  
   const [currentPartyName, setCurrentPartyName] = useState<string>(() => {
     const keys = Object.keys(parties);
-    return keys.length > 0 ? keys[0] : '';
+    const initial = keys.length > 0 ? keys[0] : '';
+    console.log(`[App] Initial state: selected party '${initial}'`);
+    return initial;
   });
   
   const [data, setData] = useState<DashboardSummary | null>(null);
@@ -24,23 +32,34 @@ function App() {
 
   // Load dashboard data whenever the selected party changes or parties list updates
   useEffect(() => {
+    console.log(`[App] Effect triggered. Party: '${currentPartyName}', Total Parties: ${Object.keys(parties).length}`);
+    
     if (currentPartyName && parties[currentPartyName]) {
+      console.log(`[App] Calculating dashboard data for ${currentPartyName}`);
       const p = parties[currentPartyName];
-      const summary = getDashboardData(p.incomeCsv, p.expenseCsv);
-      setData(summary);
+      try {
+        const summary = getDashboardData(p.incomeCsv, p.expenseCsv);
+        setData(summary);
+        console.log("[App] Data loaded successfully");
+      } catch (err) {
+        console.error("[App] Error calculating dashboard data:", err);
+      }
     } else if (!currentPartyName && Object.keys(parties).length === 0) {
+      console.log("[App] No parties available, switching to upload view");
       setData(null);
       setCurrentView('upload');
     }
   }, [currentPartyName, parties]);
 
   const handlePartyChange = (name: string) => {
+    console.log(`[App] Changing party to: ${name}`);
     setCurrentPartyName(name);
     setIsMenuOpen(false);
     setCurrentView('dashboard');
   };
 
   const handleDataSaved = (newName: string) => {
+    console.log(`[App] Data saved for: ${newName}, reloading parties...`);
     const updatedParties = getStoredParties();
     setParties(updatedParties);
     setCurrentPartyName(newName);
@@ -49,6 +68,7 @@ function App() {
 
   const handleDeleteParty = (e: React.MouseEvent, name: string) => {
     e.stopPropagation(); // Prevent triggering selection
+    console.log(`[App] Request to delete: ${name}`);
     if (window.confirm(`Tem certeza que deseja excluir o dashboard de "${name}"?`)) {
       const updatedParties = deletePartyData(name);
       setParties(updatedParties);
@@ -57,8 +77,10 @@ function App() {
       if (currentPartyName === name) {
         const remainingKeys = Object.keys(updatedParties);
         if (remainingKeys.length > 0) {
+          console.log(`[App] Deleted current party. Switching to: ${remainingKeys[0]}`);
           setCurrentPartyName(remainingKeys[0]);
         } else {
+          console.log(`[App] All parties deleted.`);
           setCurrentPartyName('');
           setCurrentView('upload');
         }
