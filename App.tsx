@@ -1,22 +1,57 @@
-import React, { useMemo, useState } from 'react';
-import { LayoutDashboard, TrendingUp, TrendingDown, PieChart as PieChartIcon, DollarSign, Wallet } from 'lucide-react';
-import { getDashboardData } from './services/dataService';
+import React, { useEffect, useState, useMemo } from 'react';
+import { LayoutDashboard, TrendingUp, TrendingDown, PieChart as PieChartIcon, DollarSign, Wallet, Upload, ChevronDown } from 'lucide-react';
+import { getDashboardData, getStoredParties } from './services/dataService';
 import Chatbot from './components/Chatbot';
 import { CashFlowChart, TopEntitiesChart, CategoryPieChart } from './components/Charts';
 import IncomeList from './components/IncomeList';
 import ExpenseList from './components/ExpenseList';
+import DataUpload from './components/DataUpload';
+import { DashboardSummary } from './types';
 
-type ViewState = 'dashboard' | 'incomes' | 'expenses';
+type ViewState = 'dashboard' | 'incomes' | 'expenses' | 'upload';
 
 function App() {
-  const data = useMemo(() => getDashboardData(), []);
+  const [parties, setParties] = useState(getStoredParties());
+  const [currentPartyName, setCurrentPartyName] = useState<string>(() => {
+    const keys = Object.keys(parties);
+    return keys.length > 0 ? keys[0] : '';
+  });
+  
+  const [data, setData] = useState<DashboardSummary | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Load dashboard data whenever the selected party changes or parties list updates
+  useEffect(() => {
+    if (currentPartyName && parties[currentPartyName]) {
+      const p = parties[currentPartyName];
+      const summary = getDashboardData(p.incomeCsv, p.expenseCsv);
+      setData(summary);
+    }
+  }, [currentPartyName, parties]);
+
+  const handlePartyChange = (name: string) => {
+    setCurrentPartyName(name);
+    setIsMenuOpen(false);
+    setCurrentView('dashboard');
+  };
+
+  const handleDataSaved = (newName: string) => {
+    const updatedParties = getStoredParties();
+    setParties(updatedParties);
+    setCurrentPartyName(newName);
+    setCurrentView('dashboard');
+  };
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const renderContent = () => {
+    if (!data) return <div className="p-8 text-center">Carregando dados...</div>;
+
     switch(currentView) {
+      case 'upload':
+        return <DataUpload onDataSaved={handleDataSaved} />;
       case 'incomes':
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
@@ -155,14 +190,63 @@ function App() {
             <TrendingDown size={20} />
             <span>Despesas</span>
           </button>
+
+          <hr className="border-slate-800 my-2" />
+
+          <button 
+            onClick={() => setCurrentView('upload')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${currentView === 'upload' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}
+          >
+            <Upload size={20} />
+            <span>Importar Dados</span>
+          </button>
         </nav>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 bg-gray-50 overflow-y-auto">
         <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-          <h2 className="text-xl font-semibold text-gray-800">Dashboard Financeiro - Progressistas (PP)</h2>
-          <div className="text-sm text-gray-500">Última atualização: 17/12/2025</div>
+          <div>
+             {/* Party Selector */}
+             <div className="relative">
+                <button 
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="flex items-center gap-2 text-xl font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+                >
+                  {currentPartyName || "Selecione um partido"}
+                  <ChevronDown size={20} className="text-gray-400" />
+                </button>
+
+                {isMenuOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-20">
+                     <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                       Partidos Cadastrados
+                     </div>
+                     {Object.keys(parties).map(pName => (
+                       <button
+                         key={pName}
+                         onClick={() => handlePartyChange(pName)}
+                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${currentPartyName === pName ? 'text-blue-600 font-medium bg-blue-50' : 'text-gray-700'}`}
+                       >
+                         {pName}
+                       </button>
+                     ))}
+                     <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button 
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setCurrentView('upload');
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 font-medium flex items-center gap-2"
+                        >
+                          <Upload size={14} /> Novo Partido
+                        </button>
+                     </div>
+                  </div>
+                )}
+             </div>
+          </div>
+          <div className="text-sm text-gray-500">Última atualização: {new Date().toLocaleDateString('pt-BR')}</div>
         </header>
 
         <div className="p-6 max-w-7xl mx-auto">
@@ -170,7 +254,8 @@ function App() {
         </div>
       </main>
 
-      <Chatbot data={data} />
+      {/* Pass the dynamic data to the chatbot */}
+      {data && <Chatbot data={data} />}
     </div>
   );
 }

@@ -1,15 +1,14 @@
 import { EXPENSES_CSV, INCOME_CSV } from './data';
 import { Expense, Income, DashboardSummary, MonthlyData, CategoryData } from '../types';
 
+const STORAGE_KEY = 'POLIFIN_DATA_DB';
+
 const parseNumber = (val: string): number => {
   if (!val) return 0;
-  // Handle Brazilian format: 414.708,07 -> 414708.07
-  // Remove thousand separators (if any, usually '.') and replace decimal ',' with '.'
   let cleanVal = val.replace(/\./g, '').replace(',', '.');
   return parseFloat(cleanVal) || 0;
 };
 
-// Helper to parse "DD/MM/YYYY" to ISO "YYYY-MM-DD" for sorting/charting
 const parseDate = (val: string): string => {
   const parts = val.split('/');
   if (parts.length === 3) {
@@ -34,8 +33,6 @@ const parseExpenses = (csv: string): Expense[] => {
     const line = lines[i];
     if (!line.trim()) continue;
     
-    // Simple split by semicolon, respecting quotes is hard without a library, 
-    // but the data seems consistent. We will remove quotes.
     const cols = line.split(';').map(c => c.replace(/^"|"$/g, ''));
     
     if (cols.length < 10) continue;
@@ -44,7 +41,7 @@ const parseExpenses = (csv: string): Expense[] => {
       date: parseDate(cols[0]),
       providerName: cols[2],
       documentNumber: cols[6],
-      value: parseNumber(cols[7]), // Valor do documento usually matches Valor do gasto
+      value: parseNumber(cols[7]), 
       description: cols[8],
       nature: cols[9]
     });
@@ -84,14 +81,53 @@ const parseIncome = (csv: string): Income[] => {
   return income;
 };
 
-export const getDashboardData = (): DashboardSummary => {
-  const expenses = parseExpenses(EXPENSES_CSV);
-  const incomes = parseIncome(INCOME_CSV);
+// --- DATA MANAGEMENT ---
+
+export interface PartyRecord {
+  name: string;
+  incomeCsv: string;
+  expenseCsv: string;
+}
+
+export const getStoredParties = (): Record<string, PartyRecord> => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Error reading storage", e);
+  }
+  
+  // Return default data if storage is empty
+  const defaultData = {
+    "Progressistas (PP)": {
+      name: "Progressistas (PP)",
+      incomeCsv: INCOME_CSV,
+      expenseCsv: EXPENSES_CSV
+    }
+  };
+  // Initialize storage
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+  return defaultData;
+};
+
+export const savePartyData = (name: string, incomeCsv: string, expenseCsv: string) => {
+  const currentData = getStoredParties();
+  currentData[name] = { name, incomeCsv, expenseCsv };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+  return currentData;
+};
+
+// --- AGGREGATION ---
+
+export const getDashboardData = (incomeCsv: string, expenseCsv: string): DashboardSummary => {
+  const expenses = parseExpenses(expenseCsv);
+  const incomes = parseIncome(incomeCsv);
 
   const totalExpense = expenses.reduce((acc, cur) => acc + cur.value, 0);
   const totalIncome = incomes.reduce((acc, cur) => acc + cur.value, 0);
 
-  // Group by Top Donors
   const donorMap = new Map<string, number>();
   incomes.forEach(inc => {
     const current = donorMap.get(inc.donorName) || 0;
@@ -102,7 +138,6 @@ export const getDashboardData = (): DashboardSummary => {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  // Group by Top Suppliers
   const supplierMap = new Map<string, number>();
   expenses.forEach(exp => {
     const current = supplierMap.get(exp.providerName) || 0;
@@ -113,10 +148,8 @@ export const getDashboardData = (): DashboardSummary => {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  // Expenses by Category (Description)
   const categoryMap = new Map<string, number>();
   expenses.forEach(exp => {
-    // Simplify description to first few words or key category
     const cat = exp.description.split('-')[0].trim();
     const current = categoryMap.get(cat) || 0;
     categoryMap.set(cat, current + exp.value);
@@ -125,12 +158,9 @@ export const getDashboardData = (): DashboardSummary => {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // Monthly Flow
   const flowMap = new Map<string, { income: number, expense: number }>();
-  
   const getMonthKey = (dateStr: string) => {
       const d = new Date(dateStr);
-      // Format YYYY-MM for sorting
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
@@ -149,7 +179,7 @@ export const getDashboardData = (): DashboardSummary => {
   const monthlyFlow = Array.from(flowMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([key, val]) => ({
-          name: key, // Keep YYYY-MM for simpler sorting, render nice label in chart
+          name: key,
           income: val.income,
           expense: val.expense
       }));
