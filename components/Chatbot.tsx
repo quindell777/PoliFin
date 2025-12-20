@@ -31,12 +31,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ data }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    console.log("[Chatbot] Component mounted or data updated. Initializing chat session...");
     const initChat = async () => {
       try {
         const session = await createChatSession(data);
         setChatSession(session);
+        console.log("[Chatbot] Session initialized.");
       } catch (e) {
-        console.error("Failed to init chat", e);
+        console.error("[Chatbot] Failed to init chat:", e);
       }
     };
     initChat();
@@ -47,8 +49,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ data }) => {
   }, [messages]);
 
   const handleSend = async (text: string = input) => {
-    if (!text.trim() || !chatSession) return;
+    if (!text.trim() || !chatSession) {
+      console.warn("[Chatbot] Send aborted. Empty text or no session.");
+      return;
+    }
 
+    console.log(`[Chatbot] User sending message: "${text}"`);
     setMessages(prev => [...prev, { role: 'user', text: text }]);
     setInput('');
     setIsLoading(true);
@@ -56,9 +62,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ data }) => {
     try {
       const response = await chatSession.sendMessage({ message: text });
       const responseText = response.text || "Desculpe, não consegui processar a resposta.";
+      console.log("[Chatbot] Model response received.");
       setMessages(prev => [...prev, { role: 'model', text: responseText }]);
     } catch (error) {
-      console.error(error);
+      console.error("[Chatbot] Error sending message:", error);
       setMessages(prev => [...prev, { role: 'model', text: "Erro ao conectar com o serviço de IA." }]);
     } finally {
       setIsLoading(false);
@@ -69,7 +76,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ data }) => {
     <div className="fixed bottom-6 right-6 z-50 font-sans">
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            console.log("[Chatbot] Opening UI");
+            setIsOpen(true);
+          }}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-all hover:scale-105 flex items-center gap-2"
         >
           <MessageCircle size={28} />

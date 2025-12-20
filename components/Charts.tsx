@@ -32,47 +32,54 @@ const COLORS = [
   '#64748B', // Slate
 ];
 
-export const CashFlowChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => (
-  <ResponsiveContainer width="100%" height={300}>
-    <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-      <defs>
-        <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-        </linearGradient>
-        <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
-          <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-        </linearGradient>
-      </defs>
-      <XAxis dataKey="name" stroke="#6B7280" tick={{fontSize: 12}} />
-      <YAxis stroke="#6B7280" tick={{fontSize: 12}} tickFormatter={(value) => `R$${(value/1000).toFixed(0)}k`} />
-      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-      <Tooltip 
-        formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
-      />
-      <Legend />
-      <Area type="monotone" dataKey="income" name="Receitas" stroke="#10B981" fillOpacity={1} fill="url(#colorIncome)" />
-      <Area type="monotone" dataKey="expense" name="Despesas" stroke="#EF4444" fillOpacity={1} fill="url(#colorExpense)" />
-    </AreaChart>
-  </ResponsiveContainer>
-);
-
-export const TopEntitiesChart: React.FC<{ data: CategoryData[], color: string, title: string }> = ({ data, color, title }) => (
-  <div className="h-[300px] w-full">
-    <h4 className="text-center text-sm font-medium text-gray-500 mb-2">{title}</h4>
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-        <XAxis type="number" hide />
-        <YAxis dataKey="name" type="category" width={150} tick={{fontSize: 11}} />
-        <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-        <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
-      </BarChart>
+export const CashFlowChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
+  console.log(`[Charts] Rendering CashFlowChart. Data points: ${data?.length}`);
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+          </linearGradient>
+          <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+            <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="name" stroke="#6B7280" tick={{fontSize: 12}} />
+        <YAxis stroke="#6B7280" tick={{fontSize: 12}} tickFormatter={(value) => `R$${(value/1000).toFixed(0)}k`} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+        <Tooltip 
+          formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+        />
+        <Legend />
+        <Area type="monotone" dataKey="income" name="Receitas" stroke="#10B981" fillOpacity={1} fill="url(#colorIncome)" />
+        <Area type="monotone" dataKey="expense" name="Despesas" stroke="#EF4444" fillOpacity={1} fill="url(#colorExpense)" />
+      </AreaChart>
     </ResponsiveContainer>
-  </div>
-);
+  );
+};
+
+export const TopEntitiesChart: React.FC<{ data: CategoryData[], color: string, title: string }> = ({ data, color, title }) => {
+  console.log(`[Charts] Rendering TopEntitiesChart "${title}". Data points: ${data?.length}`);
+  return (
+    <div className="h-[300px] w-full">
+      <h4 className="text-center text-sm font-medium text-gray-500 mb-2">{title}</h4>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <XAxis type="number" hide />
+          <YAxis dataKey="name" type="category" width={150} tick={{fontSize: 11}} />
+          <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) => {
+  console.log(`[Charts] Rendering CategoryPieChart. Raw categories: ${data?.length}`);
   // Take top 8 categories (increased from 5 for better granularity), group rest as "Outros"
   const topLimit = 8;
   const topCats = data.slice(0, topLimit);

@@ -6,6 +6,7 @@ interface Props {
 }
 
 const IncomeList: React.FC<Props> = ({ data }) => {
+  console.log(`[IncomeList] Rendering list. Items: ${data?.length}`);
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';

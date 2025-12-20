@@ -1,6 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { DashboardSummary } from "../types";
 
+console.log("[GeminiService] Service module loading...");
+
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const formatCurrency = (val: number) => {
@@ -8,6 +10,8 @@ const formatCurrency = (val: number) => {
 };
 
 export const createChatSession = async (data: DashboardSummary) => {
+  console.log("[GeminiService] createChatSession called. Preparing context...");
+  
   // Convert dates to a more readable format for the AI if needed, 
   // but ISO format (YYYY-MM-DD) in the raw objects is excellent for reasoning.
   
@@ -55,10 +59,17 @@ export const createChatSession = async (data: DashboardSummary) => {
     Responda sempre em Português do Brasil.
   `;
 
-  return ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: {
-      systemInstruction: context,
-    },
-  });
+  try {
+    const chat = ai.chats.create({
+      model: 'gemini-3-flash-preview',
+      config: {
+        systemInstruction: context,
+      },
+    });
+    console.log("[GeminiService] Chat session created successfully.");
+    return chat;
+  } catch (error) {
+    console.error("[GeminiService] Failed to create chat session:", error);
+    throw error;
+  }
 };
