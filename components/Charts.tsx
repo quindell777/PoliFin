@@ -16,7 +16,21 @@ import {
 } from 'recharts';
 import { CategoryData, MonthlyData } from '../types';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+// Expanded color palette for better visual distinction
+const COLORS = [
+  '#3B82F6', // Blue
+  '#10B981', // Emerald
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#8B5CF6', // Violet
+  '#EC4899', // Pink
+  '#06B6D4', // Cyan
+  '#6366F1', // Indigo
+  '#84CC16', // Lime
+  '#14B8A6', // Teal
+  '#F97316', // Orange
+  '#64748B', // Slate
+];
 
 export const CashFlowChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => (
   <ResponsiveContainer width="100%" height={300}>
@@ -59,9 +73,10 @@ export const TopEntitiesChart: React.FC<{ data: CategoryData[], color: string, t
 );
 
 export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) => {
-  // Take top 5 categories, group rest as "Outros"
-  const topCats = data.slice(0, 5);
-  const othersValue = data.slice(5).reduce((acc, curr) => acc + curr.value, 0);
+  // Take top 8 categories (increased from 5 for better granularity), group rest as "Outros"
+  const topLimit = 8;
+  const topCats = data.slice(0, topLimit);
+  const othersValue = data.slice(topLimit).reduce((acc, curr) => acc + curr.value, 0);
   const finalData = othersValue > 0 ? [...topCats, { name: 'Outros', value: othersValue }] : topCats;
 
   return (
@@ -72,7 +87,7 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
           cx="50%"
           cy="50%"
           labelLine={false}
-          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+          label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
           outerRadius={100}
           fill="#8884d8"
           dataKey="value"
@@ -82,7 +97,7 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
           ))}
         </Pie>
         <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-        <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+        <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px' }} />
       </PieChart>
     </ResponsiveContainer>
   );

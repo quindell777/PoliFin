@@ -1,15 +1,22 @@
 import { EXPENSES_CSV, INCOME_CSV } from './data';
 import { Expense, Income, DashboardSummary, MonthlyData, CategoryData } from '../types';
+// @ts-ignore
+import Papa from 'papaparse';
 
 const STORAGE_KEY = 'POLIFIN_DATA_DB';
 
 const parseNumber = (val: string): number => {
   if (!val) return 0;
-  let cleanVal = val.replace(/\./g, '').replace(',', '.');
+  // Ensure we are working with a string
+  const strVal = String(val);
+  // Handle Brazilian format: 414.708,07 -> 414708.07
+  let cleanVal = strVal.replace(/\./g, '').replace(',', '.');
   return parseFloat(cleanVal) || 0;
 };
 
+// Helper to parse "DD/MM/YYYY" to ISO "YYYY-MM-DD" for sorting/charting
 const parseDate = (val: string): string => {
+  if (!val) return '';
   const parts = val.split('/');
   if (parts.length === 3) {
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -18,67 +25,49 @@ const parseDate = (val: string): string => {
 };
 
 const parseExpenses = (csv: string): Expense[] => {
-  const lines = csv.trim().split('\n');
-  const expenses: Expense[] = [];
+  // Find where the actual data starts (header row)
+  const headerSignature = 'Data da despesa';
+  const headerIndex = csv.indexOf(headerSignature);
   
-  let startIdx = 0;
-  for(let i=0; i<lines.length; i++) {
-      if(lines[i].startsWith('Data da despesa')) {
-          startIdx = i + 1;
-          break;
-      }
-  }
+  // Slice the CSV from the header onwards to avoid metadata issues
+  const cleanCsv = headerIndex >= 0 ? csv.substring(headerIndex) : csv;
 
-  for (let i = startIdx; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim()) continue;
-    
-    const cols = line.split(';').map(c => c.replace(/^"|"$/g, ''));
-    
-    if (cols.length < 10) continue;
+  // Use PapaParse for robust parsing of quotes and newlines
+  const result = Papa.parse(cleanCsv, {
+    header: true,
+    skipEmptyLines: true,
+    delimiter: ';', // SPCA standard is usually semicolon
+  });
 
-    expenses.push({
-      date: parseDate(cols[0]),
-      providerName: cols[2],
-      documentNumber: cols[6],
-      value: parseNumber(cols[7]), 
-      description: cols[8],
-      nature: cols[9]
-    });
-  }
-  return expenses;
+  return result.data.map((row: any) => ({
+    date: parseDate(row['Data da despesa']),
+    providerName: row['Nome / Razão'] || row['Nome/Razão'] || 'Fornecedor Desconhecido',
+    documentNumber: row['Nº do documento'] || '',
+    value: parseNumber(row['Valor do documento'] || row['Valor do gasto']), 
+    description: row['Descrição da despesa'] || '',
+    nature: row['Natureza do gasto'] || ''
+  })).filter((item: Expense) => item.date && (item.value > 0 || item.description !== ''));
 };
 
 const parseIncome = (csv: string): Income[] => {
-  const lines = csv.trim().split('\n');
-  const income: Income[] = [];
-  
-  let startIdx = 0;
-  for(let i=0; i<lines.length; i++) {
-      if(lines[i].startsWith('Data da receita')) {
-          startIdx = i + 1;
-          break;
-      }
-  }
+  const headerSignature = 'Data da receita';
+  const headerIndex = csv.indexOf(headerSignature);
+  const cleanCsv = headerIndex >= 0 ? csv.substring(headerIndex) : csv;
 
-  for (let i = startIdx; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim()) continue;
-    
-    const cols = line.split(';').map(c => c.replace(/^"|"$/g, ''));
-    
-    if (cols.length < 10) continue;
+  const result = Papa.parse(cleanCsv, {
+    header: true,
+    skipEmptyLines: true,
+    delimiter: ';',
+  });
 
-    income.push({
-      date: parseDate(cols[0]),
-      donorName: cols[2],
-      type: cols[4],
-      source: cols[6],
-      nature: cols[7],
-      value: parseNumber(cols[9])
-    });
-  }
-  return income;
+  return result.data.map((row: any) => ({
+    date: parseDate(row['Data da receita']),
+    donorName: row['Nome / Razão'] || row['Nome/Razão'] || 'Doador Desconhecido',
+    type: row['Espécie do recurso'] || '',
+    source: row['Fonte do recurso'] || '',
+    nature: row['Natureza do recurso'] || '',
+    value: parseNumber(row['Valor da doação'])
+  })).filter((item: Income) => item.date && item.value > 0);
 };
 
 // --- DATA MANAGEMENT ---
@@ -119,6 +108,15 @@ export const savePartyData = (name: string, incomeCsv: string, expenseCsv: strin
   return currentData;
 };
 
+export const deletePartyData = (name: string) => {
+  const currentData = getStoredParties();
+  if (currentData[name]) {
+    delete currentData[name];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+  }
+  return currentData;
+};
+
 // --- AGGREGATION ---
 
 export const getDashboardData = (incomeCsv: string, expenseCsv: string): DashboardSummary => {
@@ -128,6 +126,7 @@ export const getDashboardData = (incomeCsv: string, expenseCsv: string): Dashboa
   const totalExpense = expenses.reduce((acc, cur) => acc + cur.value, 0);
   const totalIncome = incomes.reduce((acc, cur) => acc + cur.value, 0);
 
+  // Group by Top Donors
   const donorMap = new Map<string, number>();
   incomes.forEach(inc => {
     const current = donorMap.get(inc.donorName) || 0;
@@ -138,6 +137,7 @@ export const getDashboardData = (incomeCsv: string, expenseCsv: string): Dashboa
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
+  // Group by Top Suppliers
   const supplierMap = new Map<string, number>();
   expenses.forEach(exp => {
     const current = supplierMap.get(exp.providerName) || 0;
@@ -148,8 +148,11 @@ export const getDashboardData = (incomeCsv: string, expenseCsv: string): Dashboa
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
+  // Expenses by Category (Description)
   const categoryMap = new Map<string, number>();
   expenses.forEach(exp => {
+    // Simplify description to first few words or key category
+    // Many descriptions are "CATEGORY - SUBCATEGORY - DETAIL"
     const cat = exp.description.split('-')[0].trim();
     const current = categoryMap.get(cat) || 0;
     categoryMap.set(cat, current + exp.value);
@@ -158,20 +161,26 @@ export const getDashboardData = (incomeCsv: string, expenseCsv: string): Dashboa
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
+  // Monthly Flow
   const flowMap = new Map<string, { income: number, expense: number }>();
+  
   const getMonthKey = (dateStr: string) => {
+      if (!dateStr || dateStr.length < 7) return 'N/A';
       const d = new Date(dateStr);
+      // Format YYYY-MM for sorting
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
   incomes.forEach(inc => {
       const key = getMonthKey(inc.date);
+      if (key === 'N/A') return;
       if (!flowMap.has(key)) flowMap.set(key, { income: 0, expense: 0});
       flowMap.get(key)!.income += inc.value;
   });
 
   expenses.forEach(exp => {
       const key = getMonthKey(exp.date);
+      if (key === 'N/A') return;
       if (!flowMap.has(key)) flowMap.set(key, { income: 0, expense: 0});
       flowMap.get(key)!.expense += exp.value;
   });
