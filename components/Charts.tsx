@@ -106,7 +106,7 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
         <Pie
           data={finalData}
           cx="50%"
-          cy="50%"
+          cy="40%"
           labelLine={false}
           label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
           outerRadius={100}
@@ -122,7 +122,7 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
           layout="horizontal" 
           verticalAlign="bottom" 
           align="center" 
-          wrapperStyle={{ fontSize: '12px' }} 
+          wrapperStyle={{ fontSize: '12px', paddingTop: '40px' }} 
           formatter={(val) => truncateLabel(val)}
         />
       </PieChart>
