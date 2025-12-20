@@ -32,6 +32,14 @@ const COLORS = [
   '#64748B', // Slate
 ];
 
+// Helper to truncate long labels
+const truncateLabel = (value: string, limit: number = 20) => {
+  if (typeof value === 'string' && value.length > limit) {
+    return `${value.substring(0, limit)}...`;
+  }
+  return value;
+};
+
 export const CashFlowChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
   console.log(`[Charts] Rendering CashFlowChart. Data points: ${data?.length}`);
   return (
@@ -69,7 +77,13 @@ export const TopEntitiesChart: React.FC<{ data: CategoryData[], color: string, t
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <XAxis type="number" hide />
-          <YAxis dataKey="name" type="category" width={150} tick={{fontSize: 11}} />
+          <YAxis 
+            dataKey="name" 
+            type="category" 
+            width={150} 
+            tick={{fontSize: 11}} 
+            tickFormatter={(val) => truncateLabel(val)}
+          />
           <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
           <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
         </BarChart>
@@ -104,7 +118,13 @@ export const CategoryPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) =
           ))}
         </Pie>
         <Tooltip formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-        <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px' }} />
+        <Legend 
+          layout="horizontal" 
+          verticalAlign="bottom" 
+          align="center" 
+          wrapperStyle={{ fontSize: '12px' }} 
+          formatter={(val) => truncateLabel(val)}
+        />
       </PieChart>
     </ResponsiveContainer>
   );
